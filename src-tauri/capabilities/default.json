@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Restricted permissions for Enkel local-first Markdown editor",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

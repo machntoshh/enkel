@@ -1,0 +1,29 @@
+# Dependencies & Build Artifacts
+node_modules/
+dist/
+dist-ssr/
+release-artifacts/
+src-tauri/target/
+src-tauri/gen/
+
+# Temporary & OS files
+*.local
+*.log
+*.tmp
+*.enkel.tmp
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE & Editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local user workspaces & private notes (never commit user data)
+EnkelWorkspace/
+workspace/
+*.user
+.env
+.env.*

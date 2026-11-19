@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enkel</title>
+    <link rel="icon" type="image/png" href="/src-tauri/icons/32x32.png" />
+  </head>
+  <body spellcheck="false">
+    <div id="app" class="app-shell" spellcheck="false">
+      <!-- Área principal — Editor Markdown (Esquerda / Centro) -->
+      <main class="editor-pane" id="editor-pane">
+        <header class="editor-header" id="editor-header">
+          <div class="doc-meta">
+            <span class="doc-breadcrumb" id="doc-breadcrumb">Nenhum documento aberto</span>
+            <span class="save-indicator" id="save-indicator" data-state="saved" title="Salvamento automático ativo">
+              <span class="save-dot"></span>
+              <span class="save-text" id="save-text">Pronto</span>
+            </span>
+          </div>
+
+          <div class="editor-actions">
+            <button
+              type="button"
+              class="icon-btn"
+              id="btn-insert-image"
+              title="Inserir imagem do computador (ou use Ctrl+V no editor)"
+              aria-label="Inserir imagem"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span>Imagem</span>
+            </button>
+
+            <button
+              type="button"
+              class="icon-btn"
+              id="btn-find-in-doc"
+              title="Pesquisar no documento atual (Ctrl+F)"
+              aria-label="Pesquisar no documento"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              class="mode-toggle-btn"
+              id="btn-toggle-preview"
+              title="Alternar modo raw (Ctrl+E)"
+              aria-pressed="false"
+            >
+              <span id="preview-toggle-label">raw</span>
+            </button>
+
+            <button
+              type="button"
+              class="icon-btn"
+              id="btn-toggle-sidebar"
+              title="Recolher ou expandir barra lateral (Ctrl+\)"
+              aria-label="Alternar barra lateral"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Barra discreta de busca no documento atual (Ctrl+F) -->
+        <div class="find-bar hidden" id="find-bar" role="search">
+          <input
+            type="text"
+            id="find-input"
+            class="find-input"
+            placeholder="Localizar no documento..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <span class="find-count" id="find-count">0/0</span>
+          <button type="button" class="find-nav-btn" id="btn-find-prev" title="Anterior (Shift+Enter)">↑</button>
+          <button type="button" class="find-nav-btn" id="btn-find-next" title="Próximo (Enter)">↓</button>
+          <button type="button" class="find-nav-btn" id="btn-find-close" title="Fechar (Esc)">✕</button>
+        </div>
+
+        <!-- Área de Escrita / Visualização -->
+        <div class="editor-body" id="editor-body">
+          <!-- Estado vazio inicial -->
+          <div class="empty-workspace" id="empty-state">
+            <div class="empty-content">
+              <p class="empty-philosophy">Open. Write. Save. Nothing else gets in the way.</p>
+              <div class="empty-actions">
+                <button type="button" class="primary-subtle-btn" id="btn-empty-new-note">
+                  + Nova anotação (.md) <kbd>Ctrl+N</kbd>
+                </button>
+                <button type="button" class="secondary-subtle-btn" id="btn-empty-new-folder">
+                  + Nova pasta
+                </button>
+                <button type="button" class="secondary-subtle-btn" id="btn-empty-choose-workspace">
+                  Escolher diretório de trabalho
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor estruturado (padrão) + modo raw opcional (CodeMirror 6) -->
+          <div class="writing-surface hidden" id="writing-surface">
+            <div id="notion-editor-host" class="notion-editor-host" spellcheck="false"></div>
+            <div id="codemirror-host" class="codemirror-host hidden"></div>
+
+            <!-- Menu Slash (/) estilo Notion -->
+            <div id="slash-menu" class="slash-menu hidden" role="listbox" aria-label="Comandos de bloco"></div>
+
+            <!-- Barra flutuante de formatação ao selecionar texto -->
+            <div id="selection-toolbar" class="selection-toolbar hidden" role="toolbar" aria-label="Formatação de texto">
+              <button type="button" class="sel-btn" data-mark="bold" title="Negrito (Ctrl+B)"><strong>B</strong></button>
+              <button type="button" class="sel-btn" data-mark="italic" title="Itálico (Ctrl+I)"><em>I</em></button>
+              <button type="button" class="sel-btn" data-mark="strike" title="Riscado"><s>S</s></button>
+              <button type="button" class="sel-btn" data-mark="code" title="Código inline"><code>&lt;/&gt;</code></button>
+              <button type="button" class="sel-btn" data-mark="link" title="Link">Link</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé minimalista -->
+        <footer class="editor-footer" id="editor-footer">
+          <div class="footer-left">
+            <span id="cursor-pos">Ln 1, Col 1</span>
+            <span class="footer-sep">|</span>
+            <span id="doc-stats">0 palavras · 0 caracteres</span>
+          </div>
+          <div class="footer-right">
+            <div class="footer-shortcuts">
+              <span><kbd>Tab</kbd> Indentar</span>
+              <span><kbd>Ctrl+N</kbd> Nova</span>
+              <span><kbd>Ctrl+E</kbd> raw</span>
+              <span><kbd>Ctrl+Shift+F</kbd> Buscar</span>
+            </div>
+            <button
+              type="button"
+              class="footer-support-btn"
+              id="btn-support"
+              title="Apoiar o desenvolvimento do Enkel"
+            >
+              Apoiar
+            </button>
+          </div>
+        </footer>
+      </main>
+
+      <!-- Barra lateral direita — Navegação -->
+      <aside class="sidebar-right" id="sidebar-right" aria-label="Navegação de pastas e documentos">
+        <div class="sidebar-top">
+          <div class="brand-header" title="Enkel — Your knowledge. Your files. Your space.">
+            <img src="/src/assets/logo.svg" alt="ENKEL" class="brand-logo" />
+          </div>
+
+          <div class="sidebar-toolbar">
+            <button
+              type="button"
+              class="sidebar-action-btn"
+              id="btn-new-note"
+              title="Criar novo arquivo Markdown (Ctrl+N)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+              </svg>
+              <span>Nota</span>
+            </button>
+
+            <button
+              type="button"
+              class="sidebar-action-btn"
+              id="btn-new-folder"
+              title="Criar nova pasta"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                <line x1="12" y1="11" x2="12" y2="17"></line>
+                <line x1="9" y1="14" x2="15" y2="14"></line>
+              </svg>
+              <span>Pasta</span>
+            </button>
+
+            <button
+              type="button"
+              class="sidebar-action-btn icon-only"
+              id="btn-global-search"
+              title="Pesquisar em todos os documentos (Ctrl+Shift+F / Ctrl+O)"
+              aria-label="Pesquisar documentos"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <nav class="tree-container" id="tree-container" aria-label="Estrutura de conhecimento">
+          <!-- Árvore renderizada dinamicamente -->
+        </nav>
+
+        <div class="sidebar-bottom">
+          <button
+            type="button"
+            class="workspace-selector-btn"
+            id="btn-change-workspace"
+            title="Alterar diretório de trabalho local"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span class="workspace-path-label" id="workspace-path-label">Espaço de trabalho</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Input oculto para upload de imagens -->
+    <input
+      type="file"
+      id="image-file-input"
+      class="hidden"
+      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+    />
+
+    <!-- Modal de Pesquisa Global / Abertura Rápida (Ctrl+Shift+F / Ctrl+O) -->
+    <div class="modal-backdrop hidden" id="search-modal" role="dialog" aria-modal="true" aria-label="Pesquisar documentos">
+      <div class="modal-card search-modal-card">
+        <div class="search-modal-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="text"
+            id="global-search-input"
+            class="global-search-input"
+            placeholder="Buscar por nome do arquivo ou conteúdo nas anotações..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <kbd class="esc-hint">ESC</kbd>
+        </div>
+        <div class="search-results-list" id="search-results-list"></div>
+      </div>
+    </div>
+
+    <!-- Modal de Apoio / Obrigado -->
+    <div class="modal-backdrop hidden" id="support-modal" role="dialog" aria-modal="true" aria-label="Apoiar o Enkel">
+      <div class="modal-card support-modal-card">
+        <div class="support-modal-header">
+          <span class="support-modal-badge">ENKEL</span>
+          <button type="button" class="support-close-btn" id="support-btn-close" title="Fechar (Esc)" aria-label="Fechar">✕</button>
+        </div>
+        <p class="support-message">
+          Obrigado por usar o meu app, caso queira me apoiar ficarei feliz
+        </p>
+        <div class="support-actions" id="support-actions">
+          <a
+            href="https://livepix.gg/machntossh"
+            id="support-paypal-link"
+            class="support-paypal-btn"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Apoiar via LivePix
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal genérico para criar/renomear/confirmar exclusão -->
+    <div class="modal-backdrop hidden" id="dialog-modal" role="dialog" aria-modal="true">
+      <div class="modal-card dialog-modal-card">
+        <h3 class="dialog-title" id="dialog-title">Título</h3>
+        <p class="dialog-message hidden" id="dialog-message"></p>
+        <div class="dialog-input-wrap" id="dialog-input-wrap">
+          <input
+            type="text"
+            id="dialog-input"
+            class="dialog-input"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <p class="dialog-error hidden" id="dialog-error"></p>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-btn cancel" id="dialog-btn-cancel">Cancelar</button>
+          <button type="button" class="dialog-btn confirm" id="dialog-btn-confirm">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
