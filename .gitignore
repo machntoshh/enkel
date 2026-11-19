@@ -7,6 +7,8 @@ src-tauri/target/
 src-tauri/gen/
 
 # Temporary & OS files
+__pycache__/
+*.pyc
 *.local
 *.log
 *.tmp
