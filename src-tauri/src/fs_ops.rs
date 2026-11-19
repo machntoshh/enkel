@@ -52,9 +52,24 @@ pub fn resolve_safe_path(workspace_root: &Path, rel: &str) -> Result<PathBuf, St
     let clean_rel = validate_relative_components(rel)?;
     let full = workspace_root.join(clean_rel);
 
-    if let (Ok(canon_root), Ok(canon_full)) = (workspace_root.canonicalize(), full.canonicalize()) {
-        if !canon_full.starts_with(&canon_root) {
-            return Err("Acesso negado fora do espaço de trabalho.".to_string());
+    if let Ok(canon_root) = workspace_root.canonicalize() {
+        if let Ok(canon_full) = full.canonicalize() {
+            if !canon_full.starts_with(&canon_root) {
+                return Err("Acesso negado fora do espaço de trabalho.".to_string());
+            }
+        } else {
+            let mut probe = full.parent();
+            while let Some(p) = probe {
+                if p.exists() {
+                    if let Ok(canon_parent) = p.canonicalize() {
+                        if !canon_parent.starts_with(&canon_root) {
+                            return Err("Acesso negado fora do espaço de trabalho.".to_string());
+                        }
+                    }
+                    break;
+                }
+                probe = p.parent();
+            }
         }
     }
     Ok(full)
@@ -388,6 +403,9 @@ pub fn save_image_asset(
     filename_hint: &str,
     bytes_base64: &str,
 ) -> Result<ImageAssetResult, String> {
+    if bytes_base64.len() > 35_000_000 {
+        return Err("A imagem excede o limite máximo permitido (25 MB).".to_string());
+    }
     let raw_bytes = base64::engine::general_purpose::STANDARD
         .decode(bytes_base64.trim())
         .map_err(|e| format!("Dados de imagem inválidos: {e}"))?;

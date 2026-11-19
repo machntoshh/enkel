@@ -297,8 +297,13 @@ fn set_sidebar_collapsed(state: State<'_, AppState>, collapsed: bool) -> Result<
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     let trimmed = url.trim();
-    if !trimmed.starts_with("https://") && !trimmed.starts_with("http://") {
-        return Err("Apenas URLs HTTP/HTTPS são permitidas.".to_string());
+    if (!trimmed.starts_with("https://") && !trimmed.starts_with("http://"))
+        || trimmed.len() > 2048
+        || trimmed
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || c == '"' || c == '\'')
+    {
+        return Err("URL externa inválida ou não permitida.".to_string());
     }
     #[cfg(target_os = "windows")]
     {
