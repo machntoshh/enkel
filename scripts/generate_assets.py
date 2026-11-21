@@ -328,56 +328,81 @@ def generate_wordmark_png(filepath: str):
 def render_app_icon_buffer(size: int):
     """
     Renders a square size x size RGBA buffer of the official pixel-art notepad & pencil icon
-    on a pure black rounded-square badge using box supersampling from the 490x416 mask.
+    on a smooth anti-aliased rounded-square black badge using exact area-averaging so thin
+    strokes and inner lines stay sharp and balanced even at 24x24 and 32x32 on the taskbar.
     """
     canvas = [[TRANSPARENT for _ in range(size)] for _ in range(size)]
 
-    margin = 0 if size <= 24 else max(1, size // 24)
-    radius = max(2, size // 6)
+    pad = size * 0.08
+    rad = size * 0.21
+    x0 = pad
+    y0 = pad
+    x1 = size - pad
+    y1 = size - pad
 
-    for y in range(margin, size - margin):
-        for x in range(margin, size - margin):
-            dx = 0
-            dy = 0
-            if x < margin + radius:
-                dx = (margin + radius) - x
-            elif x >= size - margin - radius:
-                dx = x - (size - margin - radius - 1)
-            if y < margin + radius:
-                dy = (margin + radius) - y
-            elif y >= size - margin - radius:
-                dy = y - (size - margin - radius - 1)
+    # 4x4 supersampled anti-aliased rounded-square black badge
+    sub = 4
+    inv_sub = 1.0 / sub
+    for y in range(size):
+        for x in range(size):
+            inside = 0
+            for sy in range(sub):
+                py = y + (sy + 0.5) * inv_sub
+                if py < y0 or py > y1:
+                    continue
+                dy = 0.0
+                if py < y0 + rad:
+                    dy = (y0 + rad) - py
+                elif py > y1 - rad:
+                    dy = py - (y1 - rad)
+                for sx in range(sub):
+                    px = x + (sx + 0.5) * inv_sub
+                    if px < x0 or px > x1:
+                        continue
+                    dx = 0.0
+                    if px < x0 + rad:
+                        dx = (x0 + rad) - px
+                    elif px > x1 - rad:
+                        dx = px - (x1 - rad)
+                    if dx * dx + dy * dy <= rad * rad:
+                        inside += 1
+            if inside > 0:
+                alpha = int(round(255 * inside / (sub * sub)))
+                canvas[y][x] = (10, 11, 11, alpha)
 
-            if dx * dx + dy * dy <= radius * radius:
-                canvas[y][x] = BG_BLACK
-
-    # Fit the 490x416 icon centered inside the black square
-    avail = size - 2 * margin
-    draw_w = max(1, int(avail * 0.72))
-    draw_h = max(1, int(draw_w * ICON_H / ICON_W))
+    # Fit the 490x416 icon centered inside the badge with smooth exact area-averaging
+    avail = size - 2.0 * pad
+    draw_w = max(1, int(round(avail * 0.70)))
+    draw_h = max(1, int(round(draw_w * ICON_H / ICON_W)))
     ox = (size - draw_w) // 2
     oy = (size - draw_h) // 2
 
     for ty in range(draw_h):
         sy0 = int(ty * ICON_H / draw_h)
         sy1 = max(sy0 + 1, int((ty + 1) * ICON_H / draw_h))
-        # Sample up to 3 rows in the source interval
-        sample_ys = [sy0, (sy0 + sy1) // 2, min(ICON_H - 1, sy1 - 1)]
         for tx in range(draw_w):
             sx0 = int(tx * ICON_W / draw_w)
             sx1 = max(sx0 + 1, int((tx + 1) * ICON_W / draw_w))
-            sample_xs = [sx0, (sx0 + sx1) // 2, min(ICON_W - 1, sx1 - 1)]
+            total = (sy1 - sy0) * (sx1 - sx0)
             hits = 0
-            for sy in sample_ys:
+            for sy in range(sy0, sy1):
                 row_off = sy * ICON_W
-                for sx in sample_xs:
+                for sx in range(sx0, sx1):
                     if ICON_MASK[row_off + sx]:
                         hits += 1
-            if hits >= 3:
+            if hits > 0:
+                cov = hits / total
+                # Keep high-res crisp while preserving smooth readable anti-aliasing at small sizes
+                if size >= 128:
+                    cov = 1.0 if cov >= 0.45 else (cov / 0.45) * 0.35
                 py = oy + ty
                 px = ox + tx
                 if 0 <= py < size and 0 <= px < size:
-                    canvas[py][px] = FG_WHITE
+                    br, bg, bb, ba = canvas[py][px]
+                    fr = int(round(br * (1.0 - cov) + 246 * cov))
+                    fg = int(round(bg * (1.0 - cov) + 248 * cov))
+                    fb = int(round(bb * (1.0 - cov) + 248 * cov))
+                    canvas[py][px] = (fr, fg, fb, max(ba, int(round(255 * cov))))
 
     return canvas
 
@@ -401,9 +426,9 @@ def main():
         buf = render_app_icon_buffer(sz)
         write_png(os.path.join(icons_dir, filename), sz, sz, buf)
 
-    # Multi-resolution .ico (16, 32, 48, 64, 128, 256)
+    # Multi-resolution .ico (16, 24, 32, 48, 64, 128, 256)
     ico_entries = []
-    for sz in (16, 32, 48, 64, 128, 256):
+    for sz in (16, 24, 32, 48, 64, 128, 256):
         tmp_path = os.path.join(icons_dir, f"_tmp_{sz}.png")
         buf = render_app_icon_buffer(sz)
         write_png(tmp_path, sz, sz, buf)
